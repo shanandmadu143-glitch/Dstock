@@ -1,153 +1,972 @@
+```html
 <!DOCTYPE html>
-<html lang="si">
+<html lang="en" class="h-full bg-slate-900">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Stock App</title>
-    <!-- Excel ගොනු කියවීමට සහ ලිවීමට අවශ්‍ය SheetJS Library එක -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Daily Stock Mobile</title>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        mobile: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            accent: '#10b981',
+                            accentHover: '#059669',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- SheetJS CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #333; }
-        .upload-section { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: #e9ecef; border-radius: 5px; margin-bottom: 20px; }
-        input[type="file"], input[type="text"], input[type="number"] { padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; }
-        input[type="file"] { width: auto; }
-        .btn { padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-        .btn:hover { background: #218838; }
-        .btn-download { background: #007bff; }
-        .btn-download:hover { background: #0069d9; }
-        .search-box { margin-bottom: 20px; }
-        .result-list { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; display: none; }
-        .result-list li { padding: 10px; border-bottom: 1px solid #ddd; cursor: pointer; background: #fafafa; }
-        .result-list li:hover { background: #e2e6ea; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-        .form-group { display: flex; flex-direction: column; }
-        .form-group label { font-weight: bold; margin-bottom: 5px; font-size: 14px; }
-        .edit-section { padding: 20px; border: 1px solid #b8daff; background: #cce5ff; border-radius: 5px; display: none; }
-        #selectedItemName { margin-top: 0; color: #004085; }
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        /* Smooth scrollbar hiding for horizontal chip list */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Mobile Bottom Sheet Slide Animation */
+        .bottom-sheet {
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+        }
+
+        .bottom-sheet-backdrop {
+            transition: opacity 0.3s ease;
+        }
+
+        /* Input highlight glow */
+        input:focus {
+            outline: none;
+        }
+
+        /* Mobile view simulation container for desktop viewports */
+        @media (min-width: 640px) {
+            .app-wrapper {
+                max-width: 480px;
+                margin: 0 auto;
+                min-height: 100vh;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+                border-left: 1px solid #334155;
+                border-right: 1px solid #334155;
+            }
+        }
     </style>
 </head>
-<body>
+<body class="h-full bg-slate-950 text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white">
 
-<div class="container">
-    <h2>Daily Stock Management</h2>
-    
-    <div class="upload-section">
-        <div>
-            <label for="excelFile"><b>Upload Excel (.xlsx):</b></label><br>
-            <input type="file" id="excelFile" accept=".xlsx, .xls">
-        </div>
-        <button class="btn btn-download" id="downloadBtn" style="display: none;" onclick="downloadExcel()">Download Updated File</button>
-    </div>
+    <!-- App Container Wrapper -->
+    <div class="app-wrapper flex flex-col min-h-screen bg-slate-900 relative pb-20 overflow-x-hidden">
 
-    <div class="search-box" id="searchSection" style="display: none;">
-        <h3>Search Material</h3>
-        <input type="text" id="searchInput" placeholder="Enter Material Code or Name..." onkeyup="searchItem()">
-        <ul class="result-list" id="resultList"></ul>
-    </div>
+        <!-- Mobile Top App Bar -->
+        <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-lg shadow-emerald-900/30">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-1.5">
+                        <h1 class="text-base font-extrabold tracking-tight text-white">Daily Stock</h1>
+                        <span class="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">App</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">Mobile Stock Manager</p>
+                </div>
+            </div>
 
-    <div class="edit-section" id="editSection">
-        <h3 id="selectedItemName"></h3>
-        <div class="form-grid">
-            <div class="form-group">
-                <label>E: Opening Stock</label>
-                <input type="number" id="valE" readonly style="background: #e9ecef;">
+            <!-- Header Quick Actions -->
+            <div class="flex items-center space-x-2">
+                <button onclick="switchTab('tools')" class="p-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition border border-slate-700/60 active:scale-95">
+                    <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i>
+                </button>
+                <button onclick="toggleInfoModal()" class="p-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition border border-slate-700/60 active:scale-95">
+                    <i class="fa-solid fa-circle-info text-sm"></i>
+                </button>
             </div>
-            <div class="form-group">
-                <label>F: Receipt</label>
-                <input type="number" id="valF" value="0">
-            </div>
-            <div class="form-group">
-                <label>G: Issues</label>
-                <input type="number" id="valG" value="0">
-            </div>
-            <div class="form-group">
-                <label>H: Return</label>
-                <input type="number" id="valH" value="0">
-            </div>
-            <div class="form-group">
-                <label>I: Received to SSL</label>
-                <input type="number" id="valI" value="0">
-            </div>
-            <div class="form-group">
-                <label>J: Sent to SSL</label>
-                <input type="number" id="valJ" value="0">
-            </div>
-        </div>
-        <button class="btn" onclick="updateStock()">Update Total Closing Stock</button>
-        <p id="successMessage" style="color: green; font-weight: bold; display: none; margin-top: 10px;">Stock Updated Successfully!</p>
-    </div>
-</div>
+        </header>
 
-<script>
-    let excelData = [];
-    let selectedRowIndex = -1;
-    let workbook = null;
-    let worksheetName = "";
-
-    // ගොනුව Upload කරන විට දත්ත කියවීම
-    document.getElementById('excelFile').addEventListener('change', function(e) {
-        let file = e.target.files[0];
-        if(!file) return;
-
-        let reader = new FileReader();
-        reader.onload = function(e) {
-            let data = new Uint8Array(e.target.result);
-            workbook = XLSX.read(data, {type: 'array'});
-            worksheetName = workbook.SheetNames[0]; // පළමු sheet එක ලබාගැනීම
-            let worksheet = workbook.Sheets[worksheetName];
+        <!-- Tab 1: Stock Items List View -->
+        <div id="view-items" class="tab-view flex-1 p-3.5 space-y-3">
             
-            // "A" ලෙස දීමෙන් A, B, C ආදී column අකුරු වලින් දත්ත වෙන් කරගනී
-            excelData = XLSX.utils.sheet_to_json(worksheet, {header: "A", defval: ""});
+            <!-- Mobile Sticky Search Box -->
+            <div class="sticky top-[57px] z-20 bg-slate-900/95 backdrop-blur-md pt-1 pb-2 space-y-2">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="searchInput" oninput="handleSearch()" placeholder="Search Code (Col B) or Name (Col C)..." 
+                        class="w-full bg-slate-800/90 border border-slate-700/80 rounded-2xl pl-9 pr-9 py-2.5 text-xs text-white placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition shadow-inner">
+                    <button id="btnClearSearch" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+
+                <!-- Horizontal Type Filter Chips -->
+                <div class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5" id="typeChipsContainer">
+                    <!-- Dynamic Filter Chips via JS -->
+                </div>
+            </div>
+
+            <!-- Quick Counter Bar -->
+            <div class="flex items-center justify-between text-[11px] text-slate-400 px-1 font-medium">
+                <span id="itemsCountText">Showing 0 Items</span>
+                <span id="modifiedCountBadge" class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full hidden">
+                    0 Updated
+                </span>
+            </div>
+
+            <!-- Items Touch Cards Container -->
+            <div id="cardsList" class="space-y-2.5">
+                <!-- Dynamic Item Cards Rendered in JS -->
+            </div>
+        </div>
+
+        <!-- Tab 2: Mobile Summary Dashboard View -->
+        <div id="view-stats" class="tab-view flex-1 p-4 space-y-4 hidden">
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 space-y-1">
+                <h2 class="text-sm font-bold text-white flex items-center">
+                    <i class="fa-solid fa-chart-pie text-emerald-400 mr-2"></i> Stock Summary Overview
+                </h2>
+                <p class="text-xs text-slate-400">Real-time balances across uploaded inventory</p>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-3.5 space-y-1">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Items</span>
+                    <p id="statTotalItems" class="text-xl font-extrabold text-white">0</p>
+                    <span class="text-[10px] text-slate-500">Unique Material Codes</span>
+                </div>
+
+                <div class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-3.5 space-y-1">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Opening (E)</span>
+                    <p id="statOpStock" class="text-xl font-extrabold text-amber-400">0</p>
+                    <span class="text-[10px] text-slate-500">Warehouse Op. Stock</span>
+                </div>
+
+                <div class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-3.5 space-y-1">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Closing (K)</span>
+                    <p id="statClosingStock" class="text-xl font-extrabold text-emerald-400">0</p>
+                    <span class="text-[10px] text-slate-500">Current Closing Balance</span>
+                </div>
+
+                <div class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-3.5 space-y-1">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Updated Items</span>
+                    <p id="statModified" class="text-xl font-extrabold text-indigo-400">0</p>
+                    <span class="text-[10px] text-slate-500">Edited in this session</span>
+                </div>
+            </div>
+
+            <!-- Movement Totals Breakdown -->
+            <div class="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Movements Total Breakdown</h3>
+                
+                <div class="space-y-2 text-xs">
+                    <div class="flex justify-between items-center pb-1.5 border-b border-slate-700/40">
+                        <span class="text-slate-400">Receipts (F)</span>
+                        <span id="statReceipts" class="font-mono font-bold text-blue-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-1.5 border-b border-slate-700/40">
+                        <span class="text-slate-400">Issues (G)</span>
+                        <span id="statIssues" class="font-mono font-bold text-rose-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-1.5 border-b border-slate-700/40">
+                        <span class="text-slate-400">Returns (H)</span>
+                        <span id="statReturns" class="font-mono font-bold text-indigo-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-1.5 border-b border-slate-700/40">
+                        <span class="text-slate-400">Rec. SSL (I)</span>
+                        <span id="statRecSsl" class="font-mono font-bold text-cyan-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-1.5 border-b border-slate-700/40">
+                        <span class="text-slate-400">Sent SSL (J)</span>
+                        <span id="statSentSsl" class="font-mono font-bold text-orange-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">Rejections (L)</span>
+                        <span id="statRejections" class="font-mono font-bold text-red-400">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Mobile Tools (Upload & Export) View -->
+        <div id="view-tools" class="tab-view flex-1 p-4 space-y-4 hidden">
             
-            document.getElementById('searchSection').style.display = 'block';
-            document.getElementById('downloadBtn').style.display = 'block';
-            alert("File Uploaded Successfully! You can now search for items.");
+            <!-- Upload Dropzone Box -->
+            <div class="bg-slate-800/80 border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-2xl p-5 text-center relative transition cursor-pointer">
+                <input type="file" id="excelFileInput" accept=".xlsx, .xls" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10" onchange="handleFileUpload(event)">
+                <div class="flex flex-col items-center space-y-2">
+                    <div class="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Upload XLSX File</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Select or drop your daily stock spreadsheet</p>
+                    </div>
+                    <span class="inline-block bg-slate-700/60 text-slate-300 text-[10px] font-semibold px-2.5 py-1 rounded-lg">Columns A to L Supported</span>
+                </div>
+            </div>
+
+            <!-- Action Buttons Grid -->
+            <div class="space-y-2.5">
+                <!-- Export XLSX Button -->
+                <button onclick="exportXlsx()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold text-xs rounded-2xl shadow-lg shadow-emerald-950/40 flex items-center justify-center space-x-2 transition">
+                    <i class="fa-solid fa-download text-sm"></i>
+                    <span>Download Updated XLSX File</span>
+                </button>
+
+                <!-- Load Sample Demo Button -->
+                <button onclick="loadSampleDataset()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-slate-200 font-semibold text-xs rounded-2xl border border-slate-700 flex items-center justify-center space-x-2 transition">
+                    <i class="fa-solid fa-rotate text-emerald-400 text-xs"></i>
+                    <span>Load Demo Sample Data</span>
+                </button>
+
+                <!-- Download Sample Blank Template -->
+                <button onclick="downloadSampleTemplate()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-slate-200 font-semibold text-xs rounded-2xl border border-slate-700 flex items-center justify-center space-x-2 transition">
+                    <i class="fa-solid fa-file-arrow-down text-blue-400 text-xs"></i>
+                    <span>Download Blank XLSX Template</span>
+                </button>
+            </div>
+
+            <!-- Spreadsheet Column Reference Card -->
+            <div class="bg-slate-800/40 border border-slate-800 rounded-2xl p-3.5 space-y-2 text-xs text-slate-400">
+                <span class="text-slate-200 font-bold flex items-center text-[11px] uppercase tracking-wider">
+                    <i class="fa-solid fa-table-columns text-emerald-400 mr-1.5"></i> Expected Excel Columns (A-L)
+                </span>
+                <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                    <div><b>A:</b> Type</div>
+                    <div><b>B:</b> Material Code</div>
+                    <div><b>C:</b> Material Name</div>
+                    <div><b>D:</b> UOM</div>
+                    <div><b>E:</b> Op.Stock-Warehouse</div>
+                    <div><b>F:</b> Receipt</div>
+                    <div><b>G:</b> Issues</div>
+                    <div><b>H:</b> Return</div>
+                    <div><b>I:</b> Recieved to SSL</div>
+                    <div><b>J:</b> Sent to SSL</div>
+                    <div><b>K:</b> Total Closing Stock</div>
+                    <div><b>L:</b> Rejection</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Fixed Mobile Bottom Navigation Bar -->
+        <nav class="fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 max-w-md mx-auto">
+            <div class="grid grid-cols-3 h-16">
+                <!-- Tab Button: Stock Items -->
+                <button onclick="switchTab('items')" id="nav-items" class="nav-btn flex flex-col items-center justify-center space-y-1 text-emerald-400 transition">
+                    <i class="fa-solid fa-boxes-stacked text-base"></i>
+                    <span class="text-[10px] font-bold">Stock List</span>
+                </button>
+
+                <!-- Tab Button: Summary Stats -->
+                <button onclick="switchTab('stats')" id="nav-stats" class="nav-btn flex flex-col items-center justify-center space-y-1 text-slate-400 transition">
+                    <i class="fa-solid fa-chart-pie text-base"></i>
+                    <span class="text-[10px] font-bold">Summary</span>
+                </button>
+
+                <!-- Tab Button: File Tools -->
+                <button onclick="switchTab('tools')" id="nav-tools" class="nav-btn flex flex-col items-center justify-center space-y-1 text-slate-400 transition">
+                    <i class="fa-solid fa-file-excel text-base"></i>
+                    <span class="text-[10px] font-bold">Upload / Export</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Mobile Bottom Sheet Item Editor Modal -->
+        <div id="bottomSheetBackdrop" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 hidden opacity-0 bottom-sheet-backdrop" onclick="closeBottomSheet()">
+            <div id="bottomSheetContent" class="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-slate-900 border-t border-slate-700/80 rounded-t-3xl max-h-[88vh] flex flex-col shadow-2xl transform translate-y-full bottom-sheet" onclick="event.stopPropagation()">
+                
+                <!-- Sheet Drag Pill Bar -->
+                <div class="py-2.5 flex justify-center cursor-pointer" onclick="closeBottomSheet()">
+                    <div class="w-12 h-1.5 bg-slate-700 rounded-full"></div>
+                </div>
+
+                <!-- Sheet Header -->
+                <div class="px-5 pb-3 border-b border-slate-800 flex items-center justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span id="sheetCode" class="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">RM-001</span>
+                            <span id="sheetType" class="text-[10px] font-semibold text-slate-400 uppercase bg-slate-800 px-1.5 py-0.5 rounded">Type</span>
+                        </div>
+                        <h2 id="sheetName" class="text-sm font-bold text-white mt-1 line-clamp-1">Material Name</h2>
+                    </div>
+                    <button onclick="closeBottomSheet()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
+
+                <!-- Sheet Form Scrollable Content -->
+                <div class="flex-1 overflow-y-auto p-5 space-y-4">
+                    
+                    <!-- LIVE FORMULA CALCULATOR BANNER -->
+                    <div class="bg-gradient-to-r from-slate-950 to-slate-900 border border-emerald-500/30 rounded-2xl p-3.5 space-y-2 shadow-inner">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="font-bold text-emerald-400 flex items-center">
+                                <i class="fa-solid fa-calculator mr-1.5"></i> Live Math Calculation
+                            </span>
+                            <span class="text-slate-400 font-mono">UOM: <b id="sheetUom" class="text-slate-200">PCS</b></span>
+                        </div>
+
+                        <!-- Live Calculation Formula View -->
+                        <div class="text-[11px] font-mono text-slate-300 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex flex-wrap items-center gap-1">
+                            <span class="text-slate-400">K =</span>
+                            <span id="formulaE" class="text-amber-400 font-bold">0</span>
+                            <span class="text-slate-500">+</span>
+                            <span id="formulaF" class="text-blue-400 font-bold">0</span>
+                            <span class="text-slate-500">-</span>
+                            <span id="formulaG" class="text-rose-400 font-bold">0</span>
+                            <span class="text-slate-500">+</span>
+                            <span id="formulaH" class="text-indigo-400 font-bold">0</span>
+                            <span class="text-slate-500">+</span>
+                            <span id="formulaI" class="text-cyan-400 font-bold">0</span>
+                            <span class="text-slate-500">-</span>
+                            <span id="formulaJ" class="text-orange-400 font-bold">0</span>
+                        </div>
+
+                        <!-- Computed Result Highlight -->
+                        <div class="flex items-center justify-between pt-1">
+                            <span class="text-xs text-slate-300 font-medium">Useable Total Closing Stock (K):</span>
+                            <span id="formulaResultK" class="text-lg font-black text-emerald-400">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Input Fields Grid with Stepper Buttons -->
+                    <div class="space-y-3">
+                        
+                        <!-- Read-only Op Stock -->
+                        <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between">
+                            <div>
+                                <label class="text-[11px] font-bold text-amber-400 uppercase">E: Op.Stock-Warehouse</label>
+                                <p class="text-[10px] text-slate-400">Read-only opening balance</p>
+                            </div>
+                            <input type="number" id="inputE" readonly class="w-24 bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-right px-3 py-1.5 rounded-lg text-sm">
+                        </div>
+
+                        <!-- F: Receipt -->
+                        <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-2.5 flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-200">F: Receipt</label>
+                            <div class="flex items-center space-x-1.5">
+                                <button type="button" onclick="stepVal('inputF', -1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">-</button>
+                                <input type="number" inputmode="decimal" id="inputF" oninput="calculateLiveFormula()" class="w-20 bg-slate-900 border border-slate-700 text-blue-400 font-mono font-bold text-center py-1.5 rounded-lg text-sm focus:border-emerald-500">
+                                <button type="button" onclick="stepVal('inputF', 1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">+</button>
+                            </div>
+                        </div>
+
+                        <!-- G: Issues -->
+                        <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-2.5 flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-200">G: Issues</label>
+                            <div class="flex items-center space-x-1.5">
+                                <button type="button" onclick="stepVal('inputG', -1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">-</button>
+                                <input type="number" inputmode="decimal" id="inputG" oninput="calculateLiveFormula()" class="w-20 bg-slate-900 border border-slate-700 text-rose-400 font-mono font-bold text-center py-1.5 rounded-lg text-sm focus:border-emerald-500">
+                                <button type="button" onclick="stepVal('inputG', 1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">+</button>
+                            </div>
+                        </div>
+
+                        <!-- H: Return -->
+                        <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-2.5 flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-200">H: Return</label>
+                            <div class="flex items-center space-x-1.5">
+                                <button type="button" onclick="stepVal('inputH', -1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">-</button>
+                                <input type="number" inputmode="decimal" id="inputH" oninput="calculateLiveFormula()" class="w-20 bg-slate-900 border border-slate-700 text-indigo-400 font-mono font-bold text-center py-1.5 rounded-lg text-sm focus:border-emerald-500">
+                                <button type="button" onclick="stepVal('inputH', 1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">+</button>
+                            </div>
+                        </div>
+
+                        <!-- I: Received to SSL -->
+                        <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-2.5 flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-200">I: Recieved to SSL</label>
+                            <div class="flex items-center space-x-1.5">
+                                <button type="button" onclick="stepVal('inputI', -1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">-</button>
+                                <input type="number" inputmode="decimal" id="inputI" oninput="calculateLiveFormula()" class="w-20 bg-slate-900 border border-slate-700 text-cyan-400 font-mono font-bold text-center py-1.5 rounded-lg text-sm focus:border-emerald-500">
+                                <button type="button" onclick="stepVal('inputI', 1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">+</button>
+                            </div>
+                        </div>
+
+                        <!-- J: Sent to SSL -->
+                        <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-2.5 flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-200">J: Sent to SSL</label>
+                            <div class="flex items-center space-x-1.5">
+                                <button type="button" onclick="stepVal('inputJ', -1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">-</button>
+                                <input type="number" inputmode="decimal" id="inputJ" oninput="calculateLiveFormula()" class="w-20 bg-slate-900 border border-slate-700 text-orange-400 font-mono font-bold text-center py-1.5 rounded-lg text-sm focus:border-emerald-500">
+                                <button type="button" onclick="stepVal('inputJ', 1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">+</button>
+                            </div>
+                        </div>
+
+                        <!-- L: Rejection -->
+                        <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-2.5 flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-200">L: Rejection</label>
+                            <div class="flex items-center space-x-1.5">
+                                <button type="button" onclick="stepVal('inputL', -1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">-</button>
+                                <input type="number" inputmode="decimal" id="inputL" class="w-20 bg-slate-900 border border-slate-700 text-red-400 font-mono font-bold text-center py-1.5 rounded-lg text-sm focus:border-emerald-500">
+                                <button type="button" onclick="stepVal('inputL', 1)" class="w-8 h-8 rounded-lg bg-slate-700 active:bg-slate-600 text-white font-bold flex items-center justify-center text-sm">+</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Sheet Footer Action Button -->
+                <div class="p-4 border-t border-slate-800 bg-slate-900/90">
+                    <button onclick="saveItemData()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold text-xs rounded-2xl shadow-lg shadow-emerald-950/50 flex items-center justify-center space-x-2 transition">
+                        <i class="fa-solid fa-check text-sm"></i>
+                        <span>Save Stock Changes</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Info / Formula Explanation Modal -->
+        <div id="infoModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xs w-full p-5 space-y-3 shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                    <h3 class="text-xs font-bold text-white flex items-center">
+                        <i class="fa-solid fa-circle-info text-emerald-400 mr-2"></i> Excel Formula Reference
+                    </h3>
+                    <button onclick="toggleInfoModal()" class="text-slate-400 hover:text-white">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
+                    <p class="font-bold text-emerald-400">Total Closing Stock (Col K):</p>
+                    <p class="font-mono bg-slate-950 p-2 rounded-xl text-[10px] text-slate-200 border border-slate-800">
+                        K = E + F - G + H + I - J
+                    </p>
+                    <p class="text-slate-400 text-[10px] pt-1">
+                        Op.Stock (E) + Receipt (F) - Issues (G) + Return (H) + Recieved to SSL (I) - Sent to SSL (J).
+                    </p>
+                </div>
+                <button onclick="toggleInfoModal()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs">
+                    Close
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Toast Feedback Banner -->
+        <div id="toastContainer" class="fixed top-14 inset-x-0 z-50 flex justify-center px-4 pointer-events-none"></div>
+
+    </div>
+
+    <script>
+        // Global State
+        let inventoryData = [];
+        let activeIndex = -1;
+        let selectedTypeFilter = "ALL";
+        let originalSheetName = "Daily_Stock";
+
+        // Preloaded Realistic Mobile Sample Dataset
+        const sampleDataset = [
+            { A: "Raw Material", B: "RM-101", C: "Cold Rolled Steel Sheet 1.2mm", D: "PCS", E: 450, F: 50, G: 20, H: 0, I: 0, J: 0, K: 480, L: 2, _modified: false },
+            { A: "Raw Material", B: "RM-102", C: "Aluminum Alloy Ingot Grade A", D: "KG", E: 1200, F: 300, G: 150, H: 10, I: 0, J: 0, K: 1360, L: 5, _modified: false },
+            { A: "Packaging", B: "PKG-201", C: "Corrugated Box 3-Ply 12x10x8", D: "PCS", E: 850, F: 0, G: 120, H: 0, I: 0, J: 0, K: 730, L: 0, _modified: false },
+            { A: "Packaging", B: "PKG-202", C: "Clear Polythene Wrap Roll", D: "ROL", E: 120, F: 30, G: 15, H: 0, I: 0, J: 0, K: 135, L: 0, _modified: false },
+            { A: "Chemical", B: "CHM-301", C: "Industrial Degreaser Solvent 20L", D: "CAN", E: 35, F: 10, G: 5, H: 0, I: 0, J: 0, K: 40, L: 0, _modified: false },
+            { A: "Electrical", B: "ELE-401", C: "Copper Wire Single Core 2.5mm", D: "MTR", E: 650, F: 100, G: 80, H: 5, I: 0, J: 0, K: 675, L: 0, _modified: false },
+            { A: "Spare Parts", B: "SPR-501", C: "High Speed Ball Bearing 6204", D: "PCS", E: 80, F: 0, G: 4, H: 0, I: 2, J: 0, K: 78, L: 0, _modified: false }
+        ];
+
+        window.onload = function() {
+            loadSampleDataset();
         };
-        reader.readAsArrayBuffer(file);
-    });
 
-    // Material Code හෝ Name එකෙන් Search කිරීම
-    function searchItem() {
-        let input = document.getElementById('searchInput').value.toLowerCase();
-        let list = document.getElementById('resultList');
-        list.innerHTML = "";
-
-        if (input.trim() === "") {
-            list.style.display = 'none';
-            return;
+        function loadSampleDataset() {
+            inventoryData = JSON.parse(JSON.stringify(sampleDataset));
+            renderTypeChips();
+            renderCardsList();
+            updateDashboardStats();
+            showToast("Demo stock data loaded", "info");
         }
 
-        let results = 0;
-        // 0 වෙනි පේළිය (Headers) මඟහැර 1 සිට කියවීම
-        for (let i = 1; i < excelData.length; i++) {
-            let row = excelData[i];
-            let code = (row["B"] || "").toString().toLowerCase();
-            let name = (row["C"] || "").toString().toLowerCase();
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
 
-            if (code.includes(input) || name.includes(input)) {
-                let li = document.createElement("li");
-                li.innerText = `${row["B"]} - ${row["C"]}`;
-                li.onclick = function() { selectItem(i); };
-                list.appendChild(li);
-                results++;
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-emerald-400');
+                btn.classList.add('text-slate-400');
+            });
+            document.getElementById(`nav-${tabId}`).classList.remove('text-slate-400');
+            document.getElementById(`nav-${tabId}`).classList.add('text-emerald-400');
+
+            if (tabId === 'stats') {
+                updateDashboardStats();
             }
-            if (results > 15) break; // වැඩිම ප්‍රතිඵල 15ක් පමණක් පෙන්වීමට
         }
-        
-        list.style.display = results > 0 ? 'block' : 'none';
-    }
 
-    // අදාල Item එක තේරූ පසු Edit ෆෝම් එකට දත්ත පිරවීම
-    function selectItem(index) {
-        selectedRowIndex = index;
-        let row = excelData[index];
-        
-        document.getElementById('selectedItemName').innerText = `Editing: ${row["B"]} - ${row["C"]}`;
-        document.getElementById('valE').value = parseFloat(row["E"]) || 0;
-        document.getElementById('valF').value = parseFloat(row["F"]) || 0;
-        document.getElementById('valG').value = parseFloat(row["G"]) || 0;
-        document.getElementById('valH').value = parseFloat(row["H"]) || 0;
-        document.getElementById('valI').value = parseFloat(row["I"]) || 0;
-        document.getElementById('valJ
+        function renderTypeChips() {
+            const container = document.getElementById('typeChipsContainer');
+            const types = new Set();
+            inventoryData.forEach(item => { if (item.A) types.add(item.A); });
+
+            let html = `
+                <button onclick="filterByType('ALL')" class="chip-btn px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition ${selectedTypeFilter === 'ALL' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300 border border-slate-700'}">
+                    All
+                </button>
+            `;
+
+            types.forEach(type => {
+                const active = selectedTypeFilter === type;
+                html += `
+                    <button onclick="filterByType('${escapeQuotes(type)}')" class="chip-btn px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition ${active ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300 border border-slate-700'}">
+                        ${escapeHtml(type)}
+                    </button>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function filterByType(type) {
+            selectedTypeFilter = type;
+            renderTypeChips();
+            renderCardsList();
+        }
+
+        function handleSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            const btnClear = document.getElementById('btnClearSearch');
+            if (query.length > 0) {
+                btnClear.classList.remove('hidden');
+            } else {
+                btnClear.classList.add('hidden');
+            }
+            renderCardsList();
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = "";
+            document.getElementById('btnClearSearch').classList.add('hidden');
+            renderCardsList();
+        }
+
+        function renderCardsList() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const listContainer = document.getElementById('cardsList');
+
+            const filtered = inventoryData.filter(item => {
+                const matchType = (selectedTypeFilter === 'ALL') || (item.A === selectedTypeFilter);
+                const matchQuery = !query || 
+                    item.B.toLowerCase().includes(query) || 
+                    item.C.toLowerCase().includes(query) || 
+                    item.A.toLowerCase().includes(query);
+                return matchType && matchQuery;
+            });
+
+            document.getElementById('itemsCountText').innerText = `Showing ${filtered.length} of ${inventoryData.length} items`;
+            
+            const modifiedCount = inventoryData.filter(i => i._modified).length;
+            const modifiedBadge = document.getElementById('modifiedCountBadge');
+            if (modifiedCount > 0) {
+                modifiedBadge.innerText = `${modifiedCount} Updated`;
+                modifiedBadge.classList.remove('hidden');
+            } else {
+                modifiedBadge.classList.add('hidden');
+            }
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="py-12 text-center text-slate-500 space-y-2">
+                        <i class="fa-solid fa-magnifying-glass text-3xl text-slate-600"></i>
+                        <p class="text-xs">No matching inventory items found.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = "";
+            filtered.forEach(item => {
+                const realIndex = inventoryData.indexOf(item);
+                const calculatedK = item.E + item.F - item.G + item.H + item.I - item.J;
+
+                html += `
+                    <div onclick="openBottomSheet(${realIndex})" class="bg-slate-800/70 active:bg-slate-800 border border-slate-700/60 active:border-emerald-500/50 rounded-2xl p-3.5 space-y-2.5 transition cursor-pointer shadow-sm relative overflow-hidden">
+                        ${item._modified ? '<div class="absolute top-0 right-0 w-2.5 h-2.5 bg-indigo-500 rounded-bl-lg"></div>' : ''}
+                        
+                        <!-- Card Header badges -->
+                        <div class="flex items-center justify-between text-[11px]">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-mono font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">${escapeHtml(item.B)}</span>
+                                <span class="text-slate-400 bg-slate-900 px-2 py-0.5 rounded-md font-semibold">${escapeHtml(item.A)}</span>
+                            </div>
+                            <span class="text-slate-400 font-bold font-mono">UOM: <b class="text-slate-200">${escapeHtml(item.D)}</b></span>
+                        </div>
+
+                        <!-- Card Material Title -->
+                        <h3 class="text-xs font-bold text-white line-clamp-2 leading-snug">${escapeHtml(item.C)}</h3>
+
+                        <!-- Stock Values Footer Grid -->
+                        <div class="pt-1 flex items-center justify-between border-t border-slate-700/40 text-[11px]">
+                            <div class="text-slate-400">
+                                Op. Stock: <span class="font-mono font-bold text-amber-300">${item.E}</span>
+                            </div>
+                            
+                            <div class="flex items-center space-x-1.5">
+                                <span class="text-[10px] text-slate-400">Closing:</span>
+                                <span class="font-mono font-extrabold text-xs px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    ${calculatedK.toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            listContainer.innerHTML = html;
+        }
+
+        function openBottomSheet(index) {
+            if (index < 0 || index >= inventoryData.length) return;
+
+            activeIndex = index;
+            const item = inventoryData[index];
+
+            document.getElementById('sheetCode').innerText = item.B;
+            document.getElementById('sheetType').innerText = item.A || "TYPE";
+            document.getElementById('sheetName').innerText = item.C;
+            document.getElementById('sheetUom').innerText = item.D || "PCS";
+
+            document.getElementById('inputE').value = item.E;
+            document.getElementById('inputF').value = item.F;
+            document.getElementById('inputG').value = item.G;
+            document.getElementById('inputH').value = item.H;
+            document.getElementById('inputI').value = item.I;
+            document.getElementById('inputJ').value = item.J;
+            document.getElementById('inputL').value = item.L;
+
+            calculateLiveFormula();
+
+            const backdrop = document.getElementById('bottomSheetBackdrop');
+            const sheet = document.getElementById('bottomSheetContent');
+
+            backdrop.classList.remove('hidden');
+            setTimeout(() => {
+                backdrop.classList.remove('opacity-0');
+                sheet.classList.remove('translate-y-full');
+            }, 10);
+        }
+
+        function closeBottomSheet() {
+            const backdrop = document.getElementById('bottomSheetBackdrop');
+            const sheet = document.getElementById('bottomSheetContent');
+
+            sheet.classList.add('translate-y-full');
+            backdrop.classList.add('opacity-0');
+
+            setTimeout(() => {
+                backdrop.classList.add('hidden');
+                activeIndex = -1;
+            }, 250);
+        }
+
+        function stepVal(inputId, delta) {
+            const input = document.getElementById(inputId);
+            let val = parseFloat(input.value) || 0;
+            val = Math.max(0, val + delta);
+            input.value = val;
+            calculateLiveFormula();
+        }
+
+        function calculateLiveFormula() {
+            const E = parseFloat(document.getElementById('inputE').value) || 0;
+            const F = parseFloat(document.getElementById('inputF').value) || 0;
+            const G = parseFloat(document.getElementById('inputG').value) || 0;
+            const H = parseFloat(document.getElementById('inputH').value) || 0;
+            const I = parseFloat(document.getElementById('inputI').value) || 0;
+            const J = parseFloat(document.getElementById('inputJ').value) || 0;
+
+            const K = E + F - G + H + I - J;
+
+            document.getElementById('formulaE').innerText = E;
+            document.getElementById('formulaF').innerText = F;
+            document.getElementById('formulaG').innerText = G;
+            document.getElementById('formulaH').innerText = H;
+            document.getElementById('formulaI').innerText = I;
+            document.getElementById('formulaJ').innerText = J;
+
+            const resK = document.getElementById('formulaResultK');
+            resK.innerText = K.toLocaleString();
+            resK.className = K < 0 ? "text-lg font-black text-rose-400" : "text-lg font-black text-emerald-400";
+        }
+
+        function saveItemData() {
+            if (activeIndex === -1) return;
+
+            const item = inventoryData[activeIndex];
+
+            const F = parseFloat(document.getElementById('inputF').value) || 0;
+            const G = parseFloat(document.getElementById('inputG').value) || 0;
+            const H = parseFloat(document.getElementById('inputH').value) || 0;
+            const I = parseFloat(document.getElementById('inputI').value) || 0;
+            const J = parseFloat(document.getElementById('inputJ').value) || 0;
+            const L = parseFloat(document.getElementById('inputL').value) || 0;
+
+            const K = item.E + F - G + H + I - J;
+
+            item.F = F;
+            item.G = G;
+            item.H = H;
+            item.I = I;
+            item.J = J;
+            item.K = K;
+            item.L = L;
+            item._modified = true;
+
+            closeBottomSheet();
+            renderCardsList();
+            showToast(`Updated ${item.B} successfully`, "success");
+        }
+
+        function updateDashboardStats() {
+            let op = 0, closing = 0, modified = 0;
+            let f = 0, g = 0, h = 0, i_val = 0, j = 0, l = 0;
+
+            inventoryData.forEach(item => {
+                op += item.E || 0;
+                closing += (item.E + item.F - item.G + item.H + item.I - item.J);
+                if (item._modified) modified++;
+                f += item.F || 0;
+                g += item.G || 0;
+                h += item.H || 0;
+                i_val += item.I || 0;
+                j += item.J || 0;
+                l += item.L || 0;
+            });
+
+            document.getElementById('statTotalItems').innerText = inventoryData.length.toLocaleString();
+            document.getElementById('statOpStock').innerText = op.toLocaleString();
+            document.getElementById('statClosingStock').innerText = closing.toLocaleString();
+            document.getElementById('statModified').innerText = modified.toLocaleString();
+
+            document.getElementById('statReceipts').innerText = f.toLocaleString();
+            document.getElementById('statIssues').innerText = g.toLocaleString();
+            document.getElementById('statReturns').innerText = h.toLocaleString();
+            document.getElementById('statRecSsl').innerText = i_val.toLocaleString();
+            document.getElementById('statSentSsl').innerText = j.toLocaleString();
+            document.getElementById('statRejections').innerText = l.toLocaleString();
+        }
+
+        function handleFileUpload(e) {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+
+            const file = files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    originalSheetName = workbook.SheetNames[0] || "Daily_Stock";
+                    const worksheet = workbook.Sheets[originalSheetName];
+
+                    const rawJson = XLSX.utils.sheet_to_json(worksheet, { header: "A", defval: "" });
+
+                    if (!rawJson || rawJson.length === 0) {
+                        showToast("File is empty!", "error");
+                        return;
+                    }
+
+                    let startIdx = 0;
+                    const firstA = String(rawJson[0]["A"] || "").toLowerCase();
+                    const firstB = String(rawJson[0]["B"] || "").toLowerCase();
+                    if (firstA.includes("type") || firstB.includes("code") || firstB.includes("material")) {
+                        startIdx = 1;
+                    }
+
+                    const parsed = [];
+                    for (let i = startIdx; i < rawJson.length; i++) {
+                        const row = rawJson[i];
+                        const E = parseFloat(row["E"]) || 0;
+                        const F = parseFloat(row["F"]) || 0;
+                        const G = parseFloat(row["G"]) || 0;
+                        const H = parseFloat(row["H"]) || 0;
+                        const I = parseFloat(row["I"]) || 0;
+                        const J = parseFloat(row["J"]) || 0;
+                        const L = parseFloat(row["L"]) || 0;
+
+                        if (!row["A"] && !row["B"] && !row["C"] && E === 0) continue;
+
+                        parsed.push({
+                            A: String(row["A"] || "").trim(),
+                            B: String(row["B"] || "").trim(),
+                            C: String(row["C"] || "").trim(),
+                            D: String(row["D"] || "PCS").trim(),
+                            E: E, F: F, G: G, H: H, I: I, J: J,
+                            K: E + F - G + H + I - J,
+                            L: L,
+                            _modified: false
+                        });
+                    }
+
+                    if (parsed.length === 0) {
+                        showToast("No valid stock items found in file", "error");
+                        return;
+                    }
+
+                    inventoryData = parsed;
+                    selectedTypeFilter = "ALL";
+                    renderTypeChips();
+                    renderCardsList();
+                    switchTab('items');
+                    showToast(`Loaded ${parsed.length} items from XLSX!`, "success");
+
+                } catch (err) {
+                    console.error(err);
+                    showToast("Error reading XLSX file!", "error");
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function exportXlsx() {
+            if (inventoryData.length === 0) {
+                showToast("No data to export", "error");
+                return;
+            }
+
+            const headerRow = {
+                A: "Type",
+                B: "Material Code",
+                C: "Material Name",
+                D: "UOM",
+                E: "Op.Stock-Warehouse",
+                F: "Receipt",
+                G: "Issues",
+                H: "Return",
+                I: "Recieved to SSL",
+                J: "Sent to SSL",
+                K: "Useable Material Total Closing Stock",
+                L: "Rejection"
+            };
+
+            const exportRows = [headerRow];
+
+            inventoryData.forEach(item => {
+                const K = item.E + item.F - item.G + item.H + item.I - item.J;
+                exportRows.push({
+                    A: item.A,
+                    B: item.B,
+                    C: item.C,
+                    D: item.D,
+                    E: item.E,
+                    F: item.F,
+                    G: item.G,
+                    H: item.H,
+                    I: item.I,
+                    J: item.J,
+                    K: K,
+                    L: item.L
+                });
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportRows, { header: ["A","B","C","D","E","F","G","H","I","J","K","L"], skipHeader: true });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, originalSheetName || "Daily_Stock");
+
+            const dateStr = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `Daily_Stock_Mobile_${dateStr}.xlsx`);
+            showToast("Exported updated XLSX file!", "success");
+        }
+
+        function downloadSampleTemplate() {
+            const headerRow = {
+                A: "Type",
+                B: "Material Code",
+                C: "Material Name",
+                D: "UOM",
+                E: "Op.Stock-Warehouse",
+                F: "Receipt",
+                G: "Issues",
+                H: "Return",
+                I: "Recieved to SSL",
+                J: "Sent to SSL",
+                K: "Useable Material Total Closing Stock",
+                L: "Rejection"
+            };
+
+            const sampleRows = sampleDataset.map(item => ({
+                A: item.A, B: item.B, C: item.C, D: item.D, E: item.E,
+                F: item.F, G: item.G, H: item.H, I: item.I, J: item.J,
+                K: item.K, L: item.L
+            }));
+
+            const data = [headerRow, ...sampleRows];
+            const ws = XLSX.utils.json_to_sheet(data, { header: ["A","B","C","D","E","F","G","H","I","J","K","L"], skipHeader: true });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Template");
+
+            XLSX.writeFile(wb, "Daily_Stock_Blank_Template.xlsx");
+            showToast("Template file downloaded", "success");
+        }
+
+        function toggleInfoModal() {
+            document.getElementById('infoModal').classList.toggle('hidden');
+        }
+
+        function showToast(msg, type = "info") {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            let icon = "fa-circle-info text-blue-400";
+            if (type === "success") icon = "fa-circle-check text-emerald-400";
+            if (type === "error") icon = "fa-triangle-exclamation text-rose-400";
+
+            toast.className = "bg-slate-950/95 border border-slate-800 text-white font-semibold text-xs px-3.5 py-2.5 rounded-2xl shadow-2xl flex items-center space-x-2 transition-all transform -translate-y-2 pointer-events-auto";
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${escapeHtml(msg)}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-4');
+                setTimeout(() => toast.remove(), 250);
+            }, 2500);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function escapeQuotes(str) {
+            if (!str) return '';
+            return String(str).replace(/'/g, "\\'");
+        }
+    </script>
+</body>
+</html>
+```
