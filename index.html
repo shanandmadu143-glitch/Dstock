@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Stock Counting | High Performance Dashboard</title>
+  
+  <!-- XLSX Library -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <div class="header-block">
+    <div class="brand-title">
+      <div class="brand-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+      <div class="brand-name-wrapper">
+        <span class="main-brand-text">Stock</span>
+        <span class="sub-badge-counting">Counting</span>
+      </div>
+    </div>
+    <div class="header-status" aria-label="App status">
+      <span id="saveStatus"><i class="fa-solid fa-circle-check"></i> Ready</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="form-group">
+      <label id="lblSearch"><i class="fa-solid fa-magnifying-glass"></i> Name or Codes:</label>
+      <div class="input-glow-wrapper search-input-container">
+        <input type="text" id="searchInput" placeholder="Type Code or Name to filter..." autocomplete="off">
+        <button type="button" id="clearSearchBtn" class="clear-search-btn" title="Clear Search" onclick="clearSearchInput()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="searchResults" class="search-results" style="display:none;"></div>
+    </div>
+
+    <div id="selectedBadge" class="selected-badge">
+      <div style="font-weight:700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-circle-check" style="color: var(--primary); font-size: 1.1rem;"></i>
+        <span><span id="dispCode"></span> - <span id="dispName"></span></span>
+      </div>
+      <div style="font-size: 0.85rem; opacity: 0.9; padding-left: 24px;">
+        UOM: <strong id="dispUom"></strong> &nbsp;|&nbsp; Closing Stock: <strong id="dispClosing"></strong>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group" style="margin-bottom:0;">
+        <label id="lblSection"><i class="fa-solid fa-layer-group"></i> Select Section:</label>
+        <select id="sectionSelect">
+          <option value="F" id="optReceipt">Receipt</option>
+          <option value="G" id="optIssues">Issues</option>
+          <option value="H" id="optReturn">Return</option>
+          <option value="I" id="optSslI">Received to SSL</option>
+          <option value="J" id="optSslJ">Sent to SSL</option>
+          <option value="L" id="optRejectionL">Rejection</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label id="lblAmount"><i class="fa-solid fa-calculator"></i> Enter Amount:</label>
+        <div class="input-glow-wrapper">
+          <input type="number" id="inputAmount" min="0" step="any" placeholder="0.00" inputmode="decimal">
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-top: 22px;">
+      <button class="btn btn-primary ripple" onclick="addSingleSectionData()" id="btnSave" type="button">
+        <i class="fa-solid fa-plus"></i> Add Entry
+      </button>
+      <button class="btn-icon-excel ripple" onclick="openExportModal('excel')" title="Download Excel & Shift Stock" id="btnExcel" type="button">
+        <i class="fa-solid fa-file-excel"></i>
+      </button>
+      <button class="btn-icon-share ripple" onclick="openExportModal('share')" title="Share File" id="btnShare" type="button">
+        <i class="fa-solid fa-share-nodes"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="footer-note" id="lblFooter">
+    Created By <span>Yomal Lakshan</span>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<!-- Loading Overlay with Spinner / Progress Bar -->
+<div id="loadingOverlay" class="loading-overlay" style="display:none;">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div id="loadingText" style="font-weight: 600; font-size: 0.95rem; color: var(--text-dark);">Processing...</div>
+  </div>
+</div>
+
+<!-- Today Uploaded Live Modal -->
+<div id="todayUploadedModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-cloud-arrow-up" style="color:var(--success);"></i> Today Uploaded / Updated Live</h3>
+      <button class="close-btn ripple" onclick="closeTodayUploadedModal()" type="button">&times;</button>
+    </div>
+    <div style="margin-bottom: 14px; flex-shrink: 0;">
+      <input type="text" id="todayModalSearchInput" placeholder="Filter today items by name or code..." autocomplete="off" style="width: 100%;">
+    </div>
+    <div class="checklist-container" id="todayCardsContainer"></div>
+  </div>
+</div>
+
+<!-- Batch Operations / Multi-select Modal -->
+<div id="batchModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-layer-group" style="color:var(--warning);"></i> Batch Operations / Multi-select</h3>
+      <button class="close-btn ripple" onclick="closeBatchModal()" type="button">&times;</button>
+    </div>
+    <div class="modal-body-scroll">
+      <p style="margin-bottom:12px; font-size:0.9rem; color:var(--text-muted);">අයිතම කිහිපයක් එකවර තෝරා එකම Section එකට එකම ප්‍රමාණයක් ඇතුළත් කරන්න:</p>
+      
+      <div class="form-grid" style="margin-bottom: 14px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label><i class="fa-solid fa-layer-group"></i> Batch Section:</label>
+          <select id="batchSectionSelect">
+            <option value="F">Receipt</option>
+            <option value="G">Issues</option>
+            <option value="H">Return</option>
+            <option value="I">Received to SSL</option>
+            <option value="J">Sent to SSL</option>
+            <option value="L">Rejection</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label><i class="fa-solid fa-calculator"></i> Batch Amount:</label>
+          <input type="number" id="batchInputAmount" min="0" step="any" placeholder="0.00">
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Select Items:</span>
+        <div>
+          <button type="button" class="btn ripple" style="padding: 4px 10px; font-size: 0.75rem; background: var(--primary-light); color: var(--primary); border: 1px solid var(--primary); border-radius: 6px;" onclick="toggleSelectAllBatch(true)">Select All</button>
+          <button type="button" class="btn ripple" style="padding: 4px 10px; font-size: 0.75rem; background: var(--danger-light); color: var(--danger); border: 1px solid var(--danger); border-radius: 6px;" onclick="toggleSelectAllBatch(false)">Deselect All</button>
+        </div>
+      </div>
+
+      <div class="checklist-container" id="batchItemsContainer" style="max-height: 220px; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px; background: var(--bg-main);"></div>
+
+      <div class="btn-row" style="margin-top: 20px;">
+        <button type="button" class="btn btn-primary ripple" onclick="applyBatchOperation()">
+          <i class="fa-solid fa-floppy-disk"></i> Apply Batch to Selected Items
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Export Format & Options Selector Modal -->
+<div id="exportModal" class="modal">
+  <div class="modal-content modal-small">
+    <div class="modal-header">
+      <h3 id="txtExportTitle"><i class="fa-solid fa-file-export" style="color:var(--primary);"></i> Download & Export</h3>
+      <button class="close-btn ripple" onclick="closeExportModal()" type="button">&times;</button>
+    </div>
+    <div class="modal-body-scroll">
+      <p style="margin-bottom:12px; font-size:0.9rem; color:var(--text-muted);">ඔබට අවශ්‍ය Format සහ ගොනුවේ තොරතුරු සකසන්න:</p>
+      
+      <div class="form-group">
+        <label><i class="fa-solid fa-file-code"></i> Format:</label>
+        <select id="exportFormatSelect" onchange="updateDefaultFileName()">
+          <option value="xlsx">Excel Workbook (.xlsx)</option>
+          <option value="csv">CSV File (.csv)</option>
+          <option value="txt">Text File (.txt)</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-top: 14px;">
+        <label><i class="fa-solid fa-pen-to-square"></i> File Name (ගොනුවේ නම):</label>
+        <div class="input-glow-wrapper">
+          <input type="text" id="exportFileNameInput" placeholder="Stock_Counting_YYYY-MM-DD">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 15px;">
+        <label><i class="fa-solid fa-toggle-on"></i> Options:</label>
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 6px;">
+          <input type="checkbox" id="chkShiftStock" style="width:18px; height:18px; cursor:pointer;">
+          <label for="chkShiftStock" style="text-transform:none; margin:0; cursor:pointer; font-size:0.88rem;">Shift Stock to Opening (Reset Daily Data)</label>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top: 24px;">
+        <button type="button" class="btn btn-primary ripple" id="btnConfirmExport" onclick="processExportAction()">
+          <i class="fa-solid fa-paper-plane"></i> Continue / Process Action
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Material Detail Modal -->
+<div id="itemDetailModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-circle-info" style="color:var(--primary);"></i> Material Details</h3>
+      <button class="close-btn ripple" onclick="closeItemDetailModal()" type="button">&times;</button>
+    </div>
+    <div class="detail-card-grid" style="overflow-y: auto;">
+      <div class="detail-item-box">
+        <div class="detail-label"><i class="fa-solid fa-barcode"></i> Material Code</div>
+        <div class="detail-value" id="detCode">-</div>
+      </div>
+      <div class="detail-item-box">
+        <div class="detail-label"><i class="fa-solid fa-tag"></i> Unit of Measure (UOM)</div>
+        <div class="detail-value" id="detUom">-</div>
+      </div>
+      <div class="detail-item-box full-width">
+        <div class="detail-label"><i class="fa-solid fa-box"></i> Material Name</div>
+        <div class="detail-value" id="detName" style="color:var(--primary);">-</div>
+      </div>
+      <div class="detail-item-box">
+        <div class="detail-label"><i class="fa-solid fa-warehouse"></i> Opening Stock</div>
+        <div class="detail-value" id="detOp">-</div>
+      </div>
+      <div class="detail-item-box">
+        <div class="detail-label"><i class="fa-solid fa-arrow-down" style="color:var(--success);"></i> Receipt (F)</div>
+        <div class="detail-value" id="detReceipt" style="color:var(--success);">-</div>
+      </div>
+      <div class="detail-item-box">
+        <div class="detail-label"><i class="fa-solid fa-arrow-up" style="color:var(--danger);"></i> Issues (G)</div>
+        <div class="detail-value" id="detIssues" style="color:var(--danger);">-</div>
+      </div>
+      <div class="detail-item-box">
+        <div class="detail-label"><i class="fa-solid fa-rotate-left" style="color:var(--warning);"></i> Return (H)</div>
+        <div class="detail-value" id="detReturn" style="color:var(--warning);">-</div>
+      </div>
+      <div class="detail-item-box">
+        <div class="detail-label"><i class="fa-solid fa-arrow-right-to-bracket" style="color:var(--success);"></i> Received to SSL</div>
+        <div class="detail-value" id="detSslI" style="color:var(--success);">-</div>
+      </div>
+      <div class="detail-item-box">
+        <div class="detail-label"><i class="fa-solid fa-arrow-right-from-bracket" style="color:var(--danger);"></i> Sent to SSL</div>
+        <div class="detail-value" id="detSslJ" style="color:var(--danger);">-</div>
+      </div>
+      <div class="detail-item-box">
+        <div class="detail-label"><i class="fa-solid fa-ban" style="color:var(--danger);"></i> Rejection</div>
+        <div class="detail-value" id="detRejectionL" style="color:var(--danger);">-</div>
+      </div>
+      <div class="detail-item-box full-width" style="background: var(--primary-light); border-color: var(--primary);">
+        <div class="detail-label"><i class="fa-solid fa-calculator"></i> Closing Stock</div>
+        <div class="detail-value" id="detClosing" style="font-size: 1.3rem; color:var(--primary);">-</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="txtSettingsTitle"><i class="fa-solid fa-sliders" style="color:var(--primary);"></i> Settings & Preferences</h3>
+      <button class="close-btn ripple" onclick="closeSettings()" type="button">&times;</button>
+    </div>
+
+    <div class="modal-body-scroll">
+      <div class="setting-option">
+        <label id="lblLanguage"><i class="fa-solid fa-language" style="color:var(--primary);"></i> Select Language / භාෂාව / மொழி:</label>
+        <select id="langSelect" onchange="changeLanguage(this.value)">
+          <option value="si">සිංහල (Sinhala)</option>
+          <option value="en">English</option>
+          <option value="ta">தமிழ் (Tamil)</option>
+        </select>
+      </div>
+
+      <div class="setting-option">
+        <label id="lblTheme"><i class="fa-solid fa-palette" style="color:var(--warning);"></i> Choose Theme:</label>
+        <select id="themeSelect" onchange="changeTheme(this.value)">
+          <option value="light">Light Theme (Default)</option>
+          <option value="dark">Dark Theme</option>
+          <option value="blue">Slate Blue Theme</option>
+        </select>
+      </div>
+
+      <div class="setting-option">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <label id="lblRestore" style="margin-bottom: 0;"><i class="fa-solid fa-file-import" style="color:var(--success);"></i> Restore Excel (.xlsx) File:</label>
+          <button class="btn ripple" onclick="openRestoreHelpModal()" type="button" style="padding: 5px 10px; background: var(--primary-light); color: var(--primary); border: 1px solid var(--primary); border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+            <i class="fa-solid fa-circle-question"></i> Help / උදව්
+          </button>
+        </div>
+        <p id="descRestore">පෙර Save කරන ලද Excel File එකක් මගින් දත්ත යාවත්කාලීන කරගන්න.</p>
+        <input type="file" id="xlsxFileInput" accept=".xlsx, .xls" style="margin-bottom: 12px;">
+        <button class="btn ripple" style="width:100%; padding: 12px; background:var(--success); color:white; border:none; border-radius:var(--radius-md); font-weight:600; cursor:pointer;" onclick="restoreFromXLSX()" id="btnRestore" type="button">
+          <i class="fa-solid fa-upload"></i> Restore Excel Data
+        </button>
+      </div>
+
+      <div class="setting-option">
+        <label id="lblBackup"><i class="fa-solid fa-file-export" style="color:var(--primary);"></i> Export Excel Backup:</label>
+        <p id="descBackup">වත්මන් දත්ත වල සුරක්ෂිත Backup එකක් ලබාගන්න.</p>
+        <button class="btn btn-secondary ripple" style="width:100%; padding: 12px; background:#475569; color:white; border:none; border-radius:var(--radius-md); font-weight:600; cursor:pointer;" onclick="downloadXLSXBackup()" id="btnBackup" type="button">
+          <i class="fa-solid fa-download"></i> Download Backup File
+        </button>
+      </div>
+
+      <div class="setting-option action-settings-grid">
+        <button class="btn ripple" onclick="openBackupModal()" type="button"><i class="fa-solid fa-shield-halved"></i> Backup & Restore</button>
+        <button class="btn ripple" onclick="openRegisteredModal()" type="button"><i class="fa-solid fa-qrcode"></i> Registered Items & QR</button>
+        <button class="btn ripple" onclick="openBatchModal()" type="button"><i class="fa-solid fa-layer-group"></i> Batch Entry</button>
+      </div>
+
+      <div class="setting-option">
+        <label id="lblReset"><i class="fa-solid fa-rotate-left" style="color:var(--danger);"></i> Reset to Default Data:</label>
+        <p id="descReset">මුල් Default දත්ත ලබා ගැනීමට මෙම පද්ධතිය Reset කරන්න.</p>
+        <button class="btn ripple" style="width:100%; padding: 12px; background:var(--danger-light); color:var(--danger); border:1px solid var(--danger); border-radius:var(--radius-md); font-weight:600; cursor:pointer;" onclick="resetToDefault()" id="btnReset" type="button">
+          <i class="fa-solid fa-trash-can"></i> Reset All Data
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Restore Help Modal -->
+<div id="restoreHelpModal" class="modal">
+  <div class="modal-content modal-small">
+    <div class="modal-header">
+      <h3 id="helpModalTitle"><i class="fa-solid fa-circle-info" style="color:var(--primary);"></i> Excel Restore & Web App Help</h3>
+      <button class="close-btn ripple" onclick="closeRestoreHelpModal()" type="button">&times;</button>
+    </div>
+
+    <div class="modal-body-scroll">
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label id="helpSelectLabel"><i class="fa-solid fa-list"></i> මාතෘකාව තෝරන්න:</label>
+        <select id="helpTopicSelect" onchange="switchHelpTopic(this.value)">
+          <option value="fileType">1. Upload කළ යුත්තේ මොන වගේ Excel File එකක්ද?</option>
+          <option value="howToDo">2. Excel File එකක් Upload කර Restore කරන්නේ කෙසේද?</option>
+          <option value="appFeatures">3. Web App එක භාවිතයෙන් කළ හැකි දේවල් මොනවාද?</option>
+        </select>
+      </div>
+
+      <div id="helpContentBox" style="background: var(--bg-main); padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color); font-size: 0.92rem; line-height: 1.6; color: var(--text-dark);">
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Registered Items & QR Codes -->
+<div id="registeredModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header"><h3><i class="fa-solid fa-qrcode" style="color:var(--primary);"></i> Registered Items & QR Codes</h3><button class="close-btn ripple" onclick="closeRegisteredModal()" type="button">&times;</button></div>
+    <div class="modal-toolbar"><span id="registeredCount" class="toolbar-count">0 items</span><button class="btn btn-primary ripple small-btn" onclick="downloadRegisteredZip()"><i class="fa-solid fa-file-zipper"></i> Download ZIP</button></div>
+    <div class="checklist-container" id="registeredItemsContainer"></div>
+  </div>
+</div>
+
+<!-- Upload / Restore -->
+<div id="uploadModal" class="modal">
+  <div class="modal-content modal-small">
+    <div class="modal-header"><h3><i class="fa-solid fa-cloud-arrow-up" style="color:var(--success);"></i> Upload / Restore</h3><button class="close-btn ripple" onclick="closeUploadModal()" type="button">&times;</button></div>
+    <div class="modal-body-scroll">
+      <div class="upload-dropzone" id="uploadDropzone">
+        <i class="fa-solid fa-file-arrow-up"></i><strong>Select multiple Excel files</strong><span>.xlsx / .xls</span>
+        <input type="file" id="multiXlsxInput" accept=".xlsx,.xls" multiple>
+      </div>
+      <div id="uploadQueue" class="upload-queue"></div>
+      <button class="btn btn-primary ripple" style="width:100%;margin-top:14px" onclick="restoreMultipleXLSX()"><i class="fa-solid fa-cloud-arrow-up"></i> Upload & Merge</button>
+    </div>
+  </div>
+</div>
+
+<!-- Backup & Restore -->
+<div id="backupModal" class="modal">
+  <div class="modal-content modal-small">
+    <div class="modal-header"><h3><i class="fa-solid fa-shield-halved" style="color:var(--primary);"></i> Backup & Restore</h3><button class="close-btn ripple" onclick="closeBackupModal()" type="button">&times;</button></div>
+    <div class="modal-body-scroll">
+      <div class="backup-grid">
+        <button class="backup-action ripple" onclick="downloadClosingBackup()"><i class="fa-solid fa-box-archive"></i><b>Closing Stock Backup</b><small>Closing Stock → Opening Stock when restored</small></button>
+        <button class="backup-action ripple" onclick="downloadFullBackup()"><i class="fa-solid fa-database"></i><b>Full Backup</b><small>Save all inventory data</small></button>
+        <label class="backup-action ripple"><i class="fa-solid fa-file-import"></i><b>Restore Closing Backup</b><small>Select a Closing Stock backup</small><input type="file" id="closingBackupInput" accept=".json,.txt" hidden onchange="restoreClosingBackup(this.files[0])"></label>
+        <label class="backup-action ripple"><i class="fa-solid fa-database"></i><b>Full Restore</b><small>Restore the complete inventory</small><input type="file" id="fullBackupInput" accept=".json" hidden onchange="restoreFullBackup(this.files[0])"></label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- History -->
+<div id="historyModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header"><h3><i class="fa-solid fa-clock-rotate-left" style="color:var(--primary);"></i> History</h3><button class="close-btn ripple" onclick="closeHistoryModal()" type="button">&times;</button></div>
+    <div class="checklist-container" id="historyContainer"></div>
+  </div>
+</div>
+
+<!-- Bottom Navigation -->
+<nav class="bottom-nav" aria-label="Main navigation">
+  <button class="bottom-nav-item" onclick="openUploadModal()"><i class="fa-solid fa-cloud-arrow-up"></i><span>Upload</span></button>
+  <button class="bottom-nav-item" onclick="openExportModal('excel')"><i class="fa-solid fa-file-export"></i><span>Export</span></button>
+  <button class="bottom-nav-add ripple" onclick="addSingleSectionData()" aria-label="Save"><i class="fa-solid fa-plus"></i></button>
+  <button class="bottom-nav-item" onclick="openHistoryModal()"><i class="fa-solid fa-clock-rotate-left"></i><span>History</span></button>
+  <button class="bottom-nav-item" onclick="openSettings()"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
+</nav>
+
+<script src="script.js"></script>
+</body>
+</html>
